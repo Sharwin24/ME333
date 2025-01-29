@@ -2,11 +2,11 @@
 #define MAX_YEARS 100   
 
 typedef struct {
-  double inv0;                    // initial investment
-  double growth;                  // growth rate, where 1.0 = zero growth
-  int years;                      // number of years to track
-  double invarray[MAX_YEARS + 1];   // investment array   ==SecA.4.9==
-} Investment;                     // the new data type is called Investment
+  double inv0;
+  double growth;
+  int years;
+  double invarray[MAX_YEARS + 1];
+} Investment;
 
 
 int getUserInput(Investment* invp);
