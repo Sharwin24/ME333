@@ -1,8 +1,8 @@
-XC32PATH=
+XC32PATH=/opt/microchip/xc32/v4.45/bin
 HARMONYPATH=
-NU32PATH=
-PORT=
-TERMEMU=
+NU32PATH=/home/sharwin/winter_2025/ME333/PIC32
+PORT=/dev/ttyUSB0
+TERMEMU=screen
 
 #This file is used to:
 #	1. compile .c files into .o files

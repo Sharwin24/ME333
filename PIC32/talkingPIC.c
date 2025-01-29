@@ -4,7 +4,7 @@
 
 int main(void) {
   char message[MAX_MESSAGE_LENGTH];
-  
+
   NU32DIP_Startup(); // cache on, interrupts on, LED/button init, UART init
   while (1) {
     NU32DIP_ReadUART1(message, MAX_MESSAGE_LENGTH);  // get message from computer
