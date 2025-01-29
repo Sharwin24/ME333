@@ -1,5 +1,5 @@
 XC32PATH=/opt/microchip/xc32/v4.45/bin
-HARMONYPATH=
+# HARMONYPATH=
 NU32PATH=/home/sharwin/winter_2025/ME333/pic
 PORT=/dev/ttyUSB0
 TERMEMU=screen
