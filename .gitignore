@@ -1,1 +1,8 @@
 .vscode/
+
+# make outputs
+*.o
+*.dis
+*.elf
+*.hex
+*.map
