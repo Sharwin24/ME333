@@ -7,7 +7,7 @@ int main(void) {
   LATBbits.LATB4 = 0;    // Turn GREEN on and YELLOW off.  These pins sink current
   LATBbits.LATB5 = 1;    // on the NU32DIP, so "high" (1) = "off" and "low" (0) = "on"
 
-  while(1) {
+  while (1) {
     delay();
     LATBINV = 0b110000;    // toggle GREEN and YELLOW; 
   }
@@ -17,8 +17,8 @@ int main(void) {
 void delay(void) {
   int j;
   for (j = 0; j < 1000000; j++) { // number is 1 million
-    while(!PORTAbits.RA4) {
-        ;   // Pin A4 is the USER switch, low (FALSE) if pressed.
+    while (!PORTAbits.RA4) {
+      ;   // Pin A4 is the USER switch, low (FALSE) if pressed.
     }
   }
 }
