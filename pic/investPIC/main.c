@@ -1,5 +1,6 @@
 #include "nu32dip.h"
-#include "helper.h"
+#include "calculate.h"
+#include "io.h"
 
 // Replace all instances of printf and scanf
 // with the appropriate combinations of 

@@ -1,10 +1,7 @@
-#ifndef HELPER__H__
-#define HELPER__H__
-
-#include <stdio.h>
+#ifndef CALCULATE__H__
+#define CALCULATE__H__
 
 #define MAX_YEARS 100
-#define MSG_LEN 25
 
 typedef struct {
   double inv0;
@@ -13,8 +10,6 @@ typedef struct {
   double invarray[MAX_YEARS + 1];
 } Investment;
 
-int getUserInput(Investment* invp);
 void calculateGrowth(Investment* invp);
-void sendOutput(double* arr, int years);
 
 #endif
