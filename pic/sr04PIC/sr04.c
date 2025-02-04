@@ -7,10 +7,8 @@
 #define ECHO PORTBbits.RB14
 #define SOUND_SPEED 346 // speed of sound in air in meters per second
 
-void delay_us(unsigned int us) {
-  _CP0_SET_COUNT(0);
-  while ((_CP0_GET_COUNT()) < (us * US_PER_TICK)) { ; }
-}
+// Ticks for 10 us
+#define TICKS_10US (10 * (CORE_TICKS_PER_SECOND / 1000000))
 
 // initialize the pins used by the SR04
 void SR04_Startup() {
@@ -26,7 +24,8 @@ unsigned int SR04_read_raw(unsigned int timeout) {
   // turn on TRIG
   TRIG = 1;
   // wait at least 10us
-  delay_us(10);
+  _CP0_SET_COUNT(0);
+  while ((_CP0_GET_COUNT()) < TICKS_10US) { ; }
   // turn off TRIG
   TRIG = 0;
   // wait until ECHO is on

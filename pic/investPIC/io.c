@@ -1,4 +1,6 @@
 #include "io.h"
+#include "calculate.h"
+#include "nu32dip.h"
 
 int getUserInput(Investment* invp) {
 
