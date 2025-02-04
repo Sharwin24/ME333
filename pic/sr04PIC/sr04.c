@@ -25,7 +25,7 @@ unsigned int SR04_read_raw(unsigned int timeout) {
   TRIG = 1;
   // wait at least 10us
   _CP0_SET_COUNT(0);
-  while ((_CP0_GET_COUNT()) < TICKS_10US) { ; }
+  while ((_CP0_GET_COUNT()) < TICKS_10US) {}
   // turn off TRIG
   TRIG = 0;
   // wait until ECHO is on
@@ -34,15 +34,17 @@ unsigned int SR04_read_raw(unsigned int timeout) {
   // unsigned int start = _CP0_GET_COUNT();
   _CP0_SET_COUNT(0);
   // wait until ECHO is off or timeout core ticks has passed
-  while (ECHO && (_CP0_GET_COUNT()) < timeout) { ; }
+  while (ECHO && (_CP0_GET_COUNT()) < timeout) {}
+  // while (ECHO) { ; }
   // note the core timer
   unsigned int end = _CP0_GET_COUNT();
   // return the difference in core times
   return end;
 }
+
 float SR04_read_meters() {
   // read the raw rs04 value [core timer ticks]
-  unsigned int raw = SR04_read_raw(CORE_TICKS_PER_SECOND);
+  unsigned int raw = SR04_read_raw(CORE_TICKS_PER_SECOND / 2);
   // convert the time to meters, the velocity of sound in air is 346 m/s
   float sec_per_tick = 1.0f / ((float)CORE_TICKS_PER_SECOND);
   float meters = ((float)raw) * (sec_per_tick / 2.0f) * ((float)SOUND_SPEED);
