@@ -43,7 +43,8 @@ unsigned int SR04_read_raw(unsigned int timeout) {
 
 float SR04_read_meters() {
   // read the raw rs04 value [core timer ticks]
-  unsigned int raw = SR04_read_raw(CORE_TICKS_PER_SECOND / 4);
+  unsigned int timeout = CORE_TICKS_PER_SECOND * 4;
+  unsigned int raw = SR04_read_raw(timeout);
   // convert the time to meters, the velocity of sound in air is 346 m/s
   float seconds = (float)raw / CORE_TICKS_PER_SECOND;
   float meters = (seconds * 346.0f) / 2.0f;
