@@ -31,12 +31,17 @@ void PWM_Startup() {
  * @param A the amplitude of the waveform
  */
 void makeWaveform(int center, int A) {
-  for (unsigned int i = 0; i < NUMSAMPS; i++) {
-    Waveform[i] = (i < NUMSAMPS / 2) ? center + A : center - A;
+  for (int i = 0; i < NUMSAMPS; ++i) {
+    if (i < NUMSAMPS / 2) {
+      Waveform[i] = center + A;
+    }
+    else {
+      Waveform[i] = center - A;
+    }
   }
 }
 
-void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller(void) {   // __TIMER_2_VECTOR = 8
+void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller(void) {   // _TIMER_2_VECTOR = 8
   static int counter = 0; // initialize counter once
 
   OC3RS = Waveform[counter];
@@ -54,7 +59,8 @@ int main(void) {
   NU32DIP_Startup();
   // PWM_Startup();
 
-  makeWaveform((PR3_VAL + 1) / 2, PR3_VAL);
+  makeWaveform((PR3_VAL + 1) / 2, (PR3_VAL + 1) / 2);
+  __builtin_disable_interrupts();
   // Configure Timer2 to call an ISR at a frequency of 1 kHz with a priority of 5
   T2CONbits.TCKPS = 0b111; // Timer2 prescaler N=256 (1:256)
   PR2 = PR2_VAL; // period = (PR2+1) * N * 12.5 ns = 1 ms, 1 kHz
@@ -64,13 +70,14 @@ int main(void) {
   RPA3Rbits.RPA3R = 0b0101; // OC3
   // Configure OC3 to use Timer2 with the interrupt enabled
   OC3CONbits.OCTSEL = 0; // use Timer2 for OC3
-  OC3CONbits.OCM = 0b111; // PWM mode with fault pin; other OC3CON bits are defaults
+  OC3CONbits.OCM = 0b110; // PWM mode without fault pin; other OC3CON bits are defaults
   OC3RS = 0; // Initialize to 0
   OC3R = 0; // initialize before turning OC3 on; afterward it is read-only
   OC3CONbits.ON = 1; // turn on OC3
   IPC2bits.T2IP = 5; // interrupt priority 5
   IFS0bits.T2IF = 0; // clear interrupt flag
   IEC0bits.T2IE = 1; // enable interrupt
+  __builtin_enable_interrupts();
 
   while (1) { ; }
   return 0;
