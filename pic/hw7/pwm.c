@@ -4,7 +4,7 @@
 #define PR3_VAL (NU32DIP_SYS_FREQ / PWM_FREQ) - 1 // period value for 20kHz
 #define DUTY_CYCLE 75 // 75%
 #define ISR_FREQ 1000 // 1kHz
-#define PR2_VAL (NU32DIP_SYS_FREQ / ISR_FREQ / 256) - 1 // period value for 1kHz with prescaler 256
+#define PR2_VAL ((NU32DIP_SYS_FREQ / ISR_FREQ) / 256) - 1 // period value for 1kHz with 256 prescaler
 
 #define NUMSAMPS 1000 // number of points in waveform
 static volatile int Waveform[NUMSAMPS]; // waveform
@@ -57,7 +57,7 @@ int main(void) {
   makeWaveform((PR3_VAL + 1) / 2, PR3_VAL);
   // Configure Timer2 to call an ISR at a frequency of 1 kHz with a priority of 5
   T2CONbits.TCKPS = 0b111; // Timer2 prescaler N=256 (1:256)
-  PR2 = PR2_VAL; // period value for 1kHz with prescaler 256
+  PR2 = PR2_VAL; // period = (PR2+1) * N * 12.5 ns = 1 ms, 1 kHz
   TMR2 = 0; // initial TMR2 count is 0
   T2CONbits.ON = 1; // turn on Timer2
   // Remap OC3 to pin RPA3
@@ -66,7 +66,7 @@ int main(void) {
   OC3CONbits.OCTSEL = 0; // use Timer2 for OC3
   OC3CONbits.OCM = 0b111; // PWM mode with fault pin; other OC3CON bits are defaults
   OC3RS = 0; // Initialize to 0
-  OC3R = 1; // initialize before turning OC3 on; afterward it is read-only
+  OC3R = 0; // initialize before turning OC3 on; afterward it is read-only
   OC3CONbits.ON = 1; // turn on OC3
   IPC2bits.T2IP = 5; // interrupt priority 5
   IFS0bits.T2IF = 0; // clear interrupt flag
