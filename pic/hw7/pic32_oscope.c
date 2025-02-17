@@ -12,6 +12,7 @@
 void ADC_Startup();
 unsigned int adc_sample_convert(int);
 
+/*
 int main(void) {
   NU32DIP_Startup();
   ADC_Startup();
@@ -56,7 +57,7 @@ int main(void) {
   }
   return 0;
 }
-
+*/
 void ADC_Startup() {
   ANSELAbits.ANSA1 = 1; // AN1 is an adc pin
   AD1CON3bits.ADCS = 1; // ADC clock period is Tad = 2*(ADCS+1)*Tpb =2*2*(1/48000000Hz) = 83ns > 75ns
