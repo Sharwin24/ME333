@@ -20,7 +20,7 @@ ser = serial.Serial('/dev/ttyUSB0', 230400)
 print('Opening port: ')
 print(ser.name)
 
-ser.write(b'.1 0 1000\n')  # Kp Ki eintmax
+ser.write(b'0.1 0.01 500.0\n')  # Kp Ki eintmax
 
 sampnum = 0
 read_samples = 10
