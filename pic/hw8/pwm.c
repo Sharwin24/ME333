@@ -15,9 +15,9 @@ static volatile int ADCarray[PLOTPTS]; // measured values to plot
 static volatile int REFarray[PLOTPTS]; // reference values to plot
 static volatile int StoringData = 0; // if this flag = 1, currently storing
 
-static volatile float Kp = 0, Ki = 0; // Controller gains
-static volatile int Eint = 0; // Integral error
-static volatile int Eint_max = 400; // maximum error integral value
+static volatile float Kp = 0.0, Ki = 0.0; // Controller gains
+static volatile float Eint = 0.0; // Integral error
+static volatile float Eint_max = 400.0; // maximum error integral value
 
 /**
  * @brief Creates a waveform and stores it in the global array Waveform
@@ -61,13 +61,13 @@ void ADC_Startup() {
 }
 
 unsigned int adc_sample_convert() {
-  // unsigned int elapsed = 0, finish_time = 0;
+  unsigned int elapsed = 0, finish_time = 0;
   // PhotoTransistor is connected to pin 3: AN1
   AD1CHSbits.CH0SA = 1;
   AD1CON1bits.SAMP = 1;
-  _CP0_SET_COUNT(0);
-  // finish_time = elapsed + SAMPLE_TIME;
-  while (_CP0_GET_COUNT() < SAMPLE_TIME) {
+  elapsed = _CP0_GET_COUNT();
+  finish_time = elapsed + SAMPLE_TIME;
+  while (_CP0_GET_COUNT() < finish_time) {
     ;
   }
   AD1CON1bits.SAMP = 0;
@@ -86,21 +86,19 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller(void) {   // _TIMER_2_VECTOR = 
 
   // Read the ADC Value and set OC3RS using controller gains
   adcval = adc_sample_convert();
-  int error = Waveform[counter] - adcval;
+  float error = Waveform[counter] - adcval;
   float u = Kp * error + Ki * Eint;
   Eint += error;
   if (Eint > Eint_max) {
     Eint = Eint_max;
-  }
-  else if (Eint < -Eint_max) {
+  } else if (Eint < -Eint_max) {
     Eint = -Eint_max;
   }
   float unew = u + 50.0;
   if (unew < 0) {
-    unew = 0;
-  }
-  else if (unew > 100) {
-    unew = 100;
+    unew = 0.0;
+  } else if (unew > 100) {
+    unew = 100.0;
   }
   OC3RS = (unsigned int)((unew / 100.0) * PR2_VAL);
 
@@ -134,8 +132,7 @@ int main(void) {
   configure_ISR();
 
   char message[100];
-  float kptemp = 0, kitemp = 0;
-  int eint_maxtemp = 0;
+  float kptemp = 0.0, kitemp = 0.0, eint_maxtemp = 0.0;
   int i = 0;
   while (1) {
     NU32DIP_ReadUART1(message, sizeof(message));
@@ -145,7 +142,7 @@ int main(void) {
     Ki = kitemp;
     Eint_max = eint_maxtemp;
     __builtin_enable_interrupts();
-    Eint = 0;
+    // Eint = 0.0;
     StoringData = 1;
     while (StoringData) {}
     for (i = 0; i < PLOTPTS; i++) {
