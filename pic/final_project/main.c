@@ -67,7 +67,7 @@ int main(void) {
       WriteUART2("b");
       break;
     }
-    case 'f': {
+    case 'f': { // set PWM (-100 to 100)
       break;
     }
     case 'g': {
