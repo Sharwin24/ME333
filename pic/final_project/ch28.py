@@ -38,6 +38,15 @@ MENU_STR = """\
 \tq: Quit client                           r: Get mode
 """
 
+
+MODE_MAP = {
+    0: 'IDLE',
+    1: 'PWM',
+    2: 'ITEST',
+    3: 'HOLD',
+    4: 'TRACK'
+}
+
 has_quit = False
 # menu loop
 while not has_quit:
@@ -53,18 +62,20 @@ while not has_quit:
     ser.write(selection_endline.encode())
 
     # take the appropriate action
-    if (selection == 'a'):
-        pass
-    elif (selection == 'b'):
-        pass
+    if (selection == 'a'):  # read current sensor (ADC counts)
+        print('Read ADC Counts is not supported')
+    elif (selection == 'b'):  # read current sensor (mA)
+        mA_str = ser.read_until(b'\n')
+        mA_float = float(mA_str)
+        print(mA_float)
     elif (selection == 'c'):  # read encoder counts
-        # Read serial from PIC32
         encoder_str = ser.read_until(b'\n')
-        # convert to int
         encoder_int = int(encoder_str)
         print(encoder_int)
-    elif (selection == 'd'):
-        pass
+    elif (selection == 'd'):  # read encoder degrees
+        encoder_str = ser.read_until(b'\n')
+        encoder_float = float(encoder_str)
+        print(encoder_int)
     elif (selection == 'e'):  # reset encoder
         print('Encoder reset')
     elif (selection == 'f'):
@@ -89,11 +100,15 @@ while not has_quit:
         pass
     elif (selection == 'p'):
         pass
-    elif (selection == 'q'):
+    elif (selection == 'q'):  # quit client
         print('Exiting client')
         has_quit = True  # exit client
         ser.close()  # be sure to close the port
-    elif (selection == 'r'):
-        pass
+    elif (selection == 'r'):  # get mode
+        mode_str = ser.read_until(b'\n')
+        mode_int = int(mode_str)
+        print(MODE_MAP[mode_int])
+    elif (selection == 'x'):  # testing command
+        print('Toggling Green LED')
     else:
         print('Invalid Selection ' + selection_endline)
