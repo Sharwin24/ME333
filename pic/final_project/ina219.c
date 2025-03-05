@@ -23,36 +23,36 @@ void INA219_Startup() {
 }
 
 // get the current in mA
-float INA219_read_current(){
+float INA219_read_current() {
   signed short value = readINA219(INA219_REG_CURRENT);
   float ma = value / 3.0;
   return ma;
 }
 
 // write 2 bytes
-void writeINA219(unsigned char reg, unsigned short value){
+void writeINA219(unsigned char reg, unsigned short value) {
   i2c_master_start();
-  i2c_master_send(INA219_ADDR<<1); // write to the INA219
+  i2c_master_send(INA219_ADDR << 1); // write to the INA219
   i2c_master_send(reg); // the reg to write to
-  i2c_master_send(value>>8);
-  i2c_master_send(value&0xff);
+  i2c_master_send(value >> 8);
+  i2c_master_send(value & 0xff);
   i2c_master_stop();
 }
 
 // read 2 bytes
-signed short readINA219(unsigned char reg){
+signed short readINA219(unsigned char reg) {
   i2c_master_start();
-  i2c_master_send(INA219_ADDR<<1); // write to the INA219
+  i2c_master_send(INA219_ADDR << 1); // write to the INA219
   i2c_master_send(reg); // the reg to read from
   i2c_master_restart();
-  i2c_master_send((INA219_ADDR<<1)|0b1); // read from the INA219
+  i2c_master_send((INA219_ADDR << 1) | 0b1); // read from the INA219
   unsigned char r1 = i2c_master_recv();
   i2c_master_ack(0); // read again
   unsigned char r2 = i2c_master_recv();
   i2c_master_ack(1); // no more reads
   i2c_master_stop();
 
-  signed short value = (r1<<8)|r2;
+  signed short value = (r1 << 8) | r2;
   return value;
 }
 
