@@ -21,5 +21,7 @@ mode_t get_mode() {
  * @param mode_t
  */
 void set_mode(mode_t new_mode) {
+  __builtin_disable_interrupts();
   mode = new_mode;
+  __builtin_enable_interrupts();
 }

@@ -42,6 +42,16 @@
 
 volatile float pwm_duty_cycle = 0.0;
 
+// Current control variables
+volatile float mA_Kp = 0.0;
+volatile float mA_Ki = 0.0;
+volatile float mA_integrator = 0.0;
+const float mA_integrator_max = 100.0;
+const float mA_integrator_min = -mA_integrator_max;
+#define ITEST_MAX_COUNT 100
+float itest_ref_current[ITEST_MAX_COUNT];
+float itest_mA[ITEST_MAX_COUNT];
+
 
 void setup_PWM() {
   __builtin_disable_interrupts();
@@ -98,6 +108,44 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     break;
   }
   case ITEST: {
+    // Track a +-200 mA 100 Hz square wave reference current.
+    // Since a half-cycle of a 100Hz signal is 5ms, and 5 ms at
+    // 5000 samples/s is 25 samples. The reference currrent toggles between
+    // +200 and -200 mA every 25 samples.
+    // To implement two full cycles of the current reference,
+    // you can use a static int variable that counts from 0 to 99,
+    // at 25, 50, and 75, the reference current sign changes.
+    // When the counter reaches 99, the mode should be set to IDLE and the counter reset to 0.
+    static int counter = 0;
+    const int half_cycle = 25;
+    // Increment the counter
+    counter++;
+    // Reset the counter and set the mode to IDLE if the counter reaches 99
+    if (counter == ITEST_MAX_COUNT - 1) {
+      counter = 0;
+      set_mode(IDLE);
+    }
+    // Get the reference current
+    float ref_current = (counter % half_cycle == 0) ? 200.0 : -200.0;
+    // Read the current sensor
+    float mA = INA219_read_current();
+    float error = ref_current - mA;
+    float u = mA_Kp * error + mA_Ki * mA_integrator;
+    mA_integrator += error;
+    if (mA_integrator > mA_integrator_max) {
+      mA_integrator = mA_integrator_max;
+    } else if (mA_integrator < mA_integrator_min) {
+      mA_integrator = mA_integrator_min;
+    }
+    // Update the arrays for plotting
+    itest_ref_current[counter] = ref_current;
+    itest_mA[counter] = mA;
+
+    // Set the direction bit based on the sign of the reference current
+    DIR_PIN = (counter % half_cycle == 0) ? 1 : 0;
+
+    // Set the PWM duty cycle
+    OC3RS = (unsigned int)((abs(u) / 200.0) * PR2_VAL);
     break;
   }
   case HOLD: {
@@ -183,10 +231,20 @@ int main(void) {
       set_mode(PWM);
       break;
     }
-    case 'g': {
+    case 'g': { // set current gains (Kp, Ki)
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%f", &mA_Kp);
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%f", &mA_Ki);
+      char m[50];
+      sprintf(m, "%f %f\r\n", mA_Kp, mA_Ki);
+      NU32DIP_WriteUART1(m);
       break;
     }
-    case 'h': {
+    case 'h': { // get current gains (Kp, Ki)
+      char m[50];
+      sprintf(m, "%f %f\r\n", mA_Kp, mA_Ki);
+      NU32DIP_WriteUART1(m);
       break;
     }
     case 'i': {
@@ -195,7 +253,8 @@ int main(void) {
     case 'j': {
       break;
     }
-    case 'k': {
+    case 'k': { // test current control
+      set_mode(ITEST);
       break;
     }
     case 'l': {

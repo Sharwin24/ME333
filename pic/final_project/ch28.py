@@ -86,10 +86,22 @@ while not has_quit:
         pwm_float = float(pwm_str)
         print(
             f'Set PWM duty cycle to {abs(pwm_float)}% with direction {"CW" if pwm_float > 0 else "CCW"}')
-    elif (selection == 'g'):
-        pass
-    elif (selection == 'h'):
-        pass
+    elif (selection == 'g'):  # set current gains (Kp, Ki)
+        Kp = input('Enter Kp: ')
+        ser.write((Kp+'\n').encode())
+        Ki = input('Enter Ki: ')
+        ser.write((Ki+'\n').encode())
+        gains_str = ser.read_until(b'\n')  # 'Kp Ki'
+        gains = gains_str.split()
+        Kp_float = float(gains[0])
+        Ki_float = float(gains[1])
+        print(f'Set current gains Kp={Kp_float} Ki={Ki_float}')
+    elif (selection == 'h'):  # get current gains (Kp, Ki)
+        gains_str = ser.read_until(b'\n')
+        gains = gains_str.split()
+        Kp_float = float(gains[0])
+        Ki_float = float(gains[1])
+        print(f'Current gains Kp={Kp_float} Ki={Ki_float}')
     elif (selection == 'i'):
         pass
     elif (selection == 'j'):
