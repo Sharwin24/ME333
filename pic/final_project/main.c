@@ -43,8 +43,8 @@
 volatile float pwm_duty_cycle = 0.0;
 
 // Current control variables
-volatile float mA_Kp = 0.3;
-volatile float mA_Ki = 0.01;
+volatile float mA_Kp = 0.6;
+volatile float mA_Ki = 0.02;
 volatile float mA_integrator = 0.0;
 const float mA_integrator_max = 100.0;
 const float mA_integrator_min = -mA_integrator_max;
