@@ -7,7 +7,13 @@ typedef enum {
   IDLE, PWM, ITEST, HOLD, TRACK
 } mode_t;
 
-mode_t get_mode();
-void set_mode(mode_t mode);
+/**
+ * @brief Global Program Mode
+ *
+ */
+static volatile mode_t mode = IDLE;
+
+static inline mode_t get_mode() { return mode; }
+static inline void set_mode(mode_t m) { mode = m; }
 
 #endif // !UTILITIES__H__

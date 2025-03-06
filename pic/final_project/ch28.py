@@ -21,7 +21,9 @@
 # q: Quit client
 # r: Get mode
 
+import matplotlib.pyplot as plt
 import serial
+import os
 ser = serial.Serial('/dev/ttyUSB0', 230400)
 print('Opening port: ')
 print(ser.name)
@@ -46,6 +48,9 @@ MODE_MAP = {
     3: 'HOLD',
     4: 'TRACK'
 }
+
+Kp_float = 0.0
+Ki_float = 0.0
 
 has_quit = False
 # menu loop
@@ -107,7 +112,34 @@ while not has_quit:
     elif (selection == 'j'):
         pass
     elif (selection == 'k'):
-        pass
+        gains_str = ser.read_until(b'\n')
+        gains = gains_str.split()
+        Kp_float = float(gains[0])
+        Ki_float = float(gains[1])
+        print('Testing current control')
+        # PIC will send ref and actual value in a loop
+        # until 100 samples are taken
+        ref_values = []
+        actual_values = []
+        for i in range(100):
+            ref_str = ser.read_until(b'\n')
+            ref_float = float(ref_str)
+            actual_str = ser.read_until(b'\n')
+            actual_float = float(actual_str)
+            ref_values.append(ref_float)
+            actual_values.append(actual_float)
+        # print('Ref values:', ref_values)
+        # print('Actual values:', actual_values)
+        # plot the values on the same plot and save the figure
+        plt.plot(ref_values, label=f'Reference [mA]')
+        plt.plot(actual_values,
+                 label=f'Actual [mA] Kp={Kp_float} Ki={Ki_float}')
+        plt.legend()
+        plt.xlabel('Sample')
+        plt.ylabel('Current [mA]')
+        plt.title('Current Control Test')
+        plt.savefig('current_control_test.png')
+        plt.close()
     elif (selection == 'l'):
         pass
     elif (selection == 'm'):
@@ -127,6 +159,6 @@ while not has_quit:
         mode_int = int(mode_str)
         print(MODE_MAP[mode_int])
     elif (selection == 'x'):  # testing command
-        print('Toggling Green LED')
+        print('Toggling LED')
     else:
         print('Invalid Selection ' + selection_endline)
