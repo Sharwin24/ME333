@@ -40,6 +40,8 @@
  // Direction pin is RPB13 (pin 24)
 #define DIR_PIN LATBbits.LATB13
 
+volatile float pwm_duty_cycle = 0.0;
+
 
 void setup_PWM() {
   __builtin_disable_interrupts();
@@ -56,9 +58,6 @@ void setup_PWM() {
   OC3RS = 0; // Initialize to 0
   OC3R = 0; // initialize before turning OC3 on; afterward it is read-only
   OC3CONbits.ON = 1; // turn on OC3
-  IPC2bits.T2IP = 5; // interrupt priority 5
-  IFS0bits.T2IF = 0; // clear interrupt flag
-  IEC0bits.T2IE = 1; // enable interrupt
   __builtin_enable_interrupts();
 }
 
@@ -81,10 +80,21 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
   // Perform control based on mode
   switch (m) {
   case IDLE: {
+    NU32DIP_GREEN = 1;
     // Set the H-bridge to brake mode
+    DIR_PIN = 0;
+    // Set the PWM value to 0
+    OC3RS = 0;
     break;
   }
   case PWM: {
+    // Set the duty cycle and direction bit according to the value (-100 to 100)
+    // Set the direction bit based on the sign of the PWM value
+    NU32DIP_GREEN = 0;
+    DIR_PIN = (pwm_duty_cycle < 0) ? 1 : 0;
+    // Set the PWM duty cycle
+    float dc = (float)abs(pwm_duty_cycle);
+    OC3RS = (unsigned int)((dc / 100.0) * PR2_VAL);
     break;
   }
   case ITEST: {
@@ -109,13 +119,18 @@ int main(void) {
   NU32DIP_Startup();
   UART2_Startup();
   INA219_Startup();
+  setup_PWM();
+  setup_current_control_ISR();
+
+  // Setup DIR_PIN as an output
+  TRISBbits.TRISB13 = 0;
+  DIR_PIN = 0;
 
   char buffer[BUF_SIZE];
+
+  // Turn off both LEDs
   NU32DIP_GREEN = 1;
   NU32DIP_YELLOW = 1;
-  __builtin_disable_interrupts();
-  // in future, initialize modules or peripherals here
-  __builtin_enable_interrupts();
   while (1) {
     NU32DIP_ReadUART1(buffer, BUF_SIZE); // we expect the next character to be a menu command
     NU32DIP_YELLOW = 1; // clear the error LED
@@ -145,9 +160,9 @@ int main(void) {
       while (!get_encoder_flag()) {}
       set_encoder_flag(0);
       char m[50];
-      int p = get_encoder_count();
+      // make sure p is in the range [0, 1336)
+      int p = get_encoder_count() % ENC_TICKS_PER_REV;
       // Convert encoder counts to degrees
-      p = p % ENC_TICKS_PER_REV; // make sure p is in the range [0, 1336)
       float deg = (float)p * ENC_COUNTS_TO_DEG;
       sprintf(m, "%f\r\n", deg);
       NU32DIP_WriteUART1(m);
@@ -158,6 +173,14 @@ int main(void) {
       break;
     }
     case 'f': { // set PWM (-100 to 100)
+      // Set the PWM value (duty cycle)
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%f", &pwm_duty_cycle);
+      char m[50];
+      sprintf(m, "%f\r\n", pwm_duty_cycle);
+      NU32DIP_WriteUART1(m);
+      // Set the mode to PWM to start motor control
+      set_mode(PWM);
       break;
     }
     case 'g': {
@@ -187,10 +210,12 @@ int main(void) {
     case 'o': {
       break;
     }
-    case 'p': {
+    case 'p': { // unpower the motor
+      // Set the mode to IDLE to stop motor control
+      set_mode(IDLE);
       break;
     }
-    case 'q': {
+    case 'q': { // quit client
       break;
     }
     case 'r': {

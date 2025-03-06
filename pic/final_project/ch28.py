@@ -75,11 +75,17 @@ while not has_quit:
     elif (selection == 'd'):  # read encoder degrees
         encoder_str = ser.read_until(b'\n')
         encoder_float = float(encoder_str)
-        print(encoder_int)
+        print(encoder_float)
     elif (selection == 'e'):  # reset encoder
         print('Encoder reset')
-    elif (selection == 'f'):
-        pass
+    elif (selection == 'f'):  # set PWM (-100 to 100)
+        duty_cycle = input('Enter duty cycle (-100 to 100): ')
+        duty_cycle_int = int(duty_cycle)
+        ser.write((str(duty_cycle_int)+'\n').encode())
+        pwm_str = ser.read_until(b'\n')
+        pwm_float = float(pwm_str)
+        print(
+            f'Set PWM duty cycle to {abs(pwm_float)}% with direction {"CW" if pwm_float > 0 else "CCW"}')
     elif (selection == 'g'):
         pass
     elif (selection == 'h'):
