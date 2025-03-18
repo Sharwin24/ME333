@@ -53,15 +53,25 @@ float itest_ref_current[ITEST_MAX_COUNT];
 float itest_mA[ITEST_MAX_COUNT];
 
 // Position control variables
-volatile float pos_Kp = 0.0;
-volatile float pos_Ki = 0.0;
+volatile float pos_Kp = 0.2;
+volatile float pos_Ki = 0.001;
 volatile float pos_integrator = 0.0;
-const float pos_integrator_max = 100.0;
+const float pos_integrator_max = 359.0;
 const float pos_integrator_min = -pos_integrator_max;
-#define POS_MAX_COUNT 100
-float pos_ref_angle[POS_MAX_COUNT];
-float pos_angle[POS_MAX_COUNT];
+volatile float pos_target_angle = 0.0;
+// #define POS_MAX_COUNT 100
+// float pos_ref_angle[POS_MAX_COUNT];
+// float pos_angle[POS_MAX_COUNT];
 
+float read_encoder_deg() {
+  WriteUART2("a");
+  while (!get_encoder_flag()) {}
+  set_encoder_flag(0);
+  // make sure p is in the range [0, 1336)
+  int p = get_encoder_count() % ENC_TICKS_PER_REV;
+  // Convert encoder counts to degrees
+  return (float)p * ENC_COUNTS_TO_DEG;
+}
 
 void setup_PWM() {
   __builtin_disable_interrupts();
@@ -179,6 +189,24 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     break;
   }
   case HOLD: {
+    // Read the encoder
+    float angle = read_encoder_deg();
+    // Compare the actual angle to the desired angle
+    float error = pos_target_angle - angle;
+    // Calculate a reference current using PID control gains
+    float u = pos_Kp * error + pos_Ki * pos_integrator;
+    pos_integrator += error;
+    if (pos_integrator > pos_integrator_max) {
+      pos_integrator = pos_integrator_max;
+    } else if (pos_integrator < pos_integrator_min) {
+      pos_integrator = pos_integrator_min;
+    }
+
+    // Set the direction bit based on the sign of the error
+    DIR_PIN = (error < 0) ? 1 : 0;
+
+    // Apply current to the motor
+    OC3RS = (unsigned int)((abs(u) / 359.0) * PR2_VAL);
     break;
   }
   case TRACK: {
@@ -234,14 +262,8 @@ int main(void) {
       break;
     }
     case 'd': { // read encoder degrees
-      WriteUART2("a");
-      while (!get_encoder_flag()) {}
-      set_encoder_flag(0);
       char m[50];
-      // make sure p is in the range [0, 1336)
-      int p = get_encoder_count() % ENC_TICKS_PER_REV;
-      // Convert encoder counts to degrees
-      float deg = (float)p * ENC_COUNTS_TO_DEG;
+      float deg = read_encoder_deg();
       sprintf(m, "%f\r\n", deg);
       NU32DIP_WriteUART1(m);
       break;
@@ -300,7 +322,14 @@ int main(void) {
       set_mode(ITEST);
       break;
     }
-    case 'l': {
+    case 'l': { // go to angle (deg)
+      char m[50];
+      sprintf(m, "%f %f\r\n", pos_Kp, pos_Ki);
+      NU32DIP_WriteUART1(m);
+      // Ask for target angle
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%f", &pos_target_angle);
+      set_mode(HOLD);
       break;
     }
     case 'm': {

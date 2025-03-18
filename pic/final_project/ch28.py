@@ -167,7 +167,14 @@ while not has_quit:
         plt.title('Current Control Test')
         plt.savefig('current_control_test.png')
         plt.close()
-    elif (selection == 'l'):
+    elif (selection == 'l'):  # go to angle (deg)
+        gains_str = ser.read_until(b'\n')
+        gains = gains_str.split()
+        Kp_Pos = float(gains[0])
+        Ki_Pos = float(gains[1])
+        target = input('Enter target angle [deg]: ')
+        ser.write((target+'\n').encode())
+        print('Going to angle')
         pass
     elif (selection == 'm'):
         pass
