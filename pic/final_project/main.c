@@ -52,6 +52,16 @@ const float mA_integrator_min = -mA_integrator_max;
 float itest_ref_current[ITEST_MAX_COUNT];
 float itest_mA[ITEST_MAX_COUNT];
 
+// Position control variables
+volatile float pos_Kp = 0.0;
+volatile float pos_Ki = 0.0;
+volatile float pos_integrator = 0.0;
+const float pos_integrator_max = 100.0;
+const float pos_integrator_min = -pos_integrator_max;
+#define POS_MAX_COUNT 100
+float pos_ref_angle[POS_MAX_COUNT];
+float pos_angle[POS_MAX_COUNT];
+
 
 void setup_PWM() {
   __builtin_disable_interrupts();
@@ -267,10 +277,20 @@ int main(void) {
       NU32DIP_WriteUART1(m);
       break;
     }
-    case 'i': {
+    case 'i': { // set position gains (Kp, Ki)
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%f", &pos_Kp);
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%f", &pos_Ki);
+      char m[50];
+      sprintf(m, "%f %f\r\n", pos_Kp, pos_Ki);
+      NU32DIP_WriteUART1(m);
       break;
     }
-    case 'j': {
+    case 'j': { // get position gains (Kp, Ki)
+      char m[50];
+      sprintf(m, "%f %f\r\n", pos_Kp, pos_Ki);
+      NU32DIP_WriteUART1(m);
       break;
     }
     case 'k': { // test current control

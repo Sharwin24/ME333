@@ -49,8 +49,13 @@ MODE_MAP = {
     4: 'TRACK'
 }
 
-Kp_float = 0.0
-Ki_float = 0.0
+# Current Control Gains
+Kp_ICtrl = 0.0
+Ki_ICtrl = 0.0
+
+# Position Control Gains
+Kp_Pos = 0.0
+Ki_Pos = 0.0
 
 has_quit = False
 # menu loop
@@ -98,24 +103,38 @@ while not has_quit:
         ser.write((Ki+'\n').encode())
         gains_str = ser.read_until(b'\n')  # 'Kp Ki'
         gains = gains_str.split()
-        Kp_float = float(gains[0])
-        Ki_float = float(gains[1])
-        print(f'Set current gains Kp={Kp_float} Ki={Ki_float}')
+        Kp_ICtrl = float(gains[0])
+        Ki_ICtrl = float(gains[1])
+        print(f'Set current gains Kp={Kp_ICtrl} Ki={Ki_ICtrl}')
     elif (selection == 'h'):  # get current gains (Kp, Ki)
         gains_str = ser.read_until(b'\n')
         gains = gains_str.split()
-        Kp_float = float(gains[0])
-        Ki_float = float(gains[1])
-        print(f'Current gains Kp={Kp_float} Ki={Ki_float}')
-    elif (selection == 'i'):
+        Kp_ICtrl = float(gains[0])
+        Ki_ICtrl = float(gains[1])
+        print(f'Current gains Kp={Kp_ICtrl} Ki={Ki_ICtrl}')
+    elif (selection == 'i'):  # set position gains (Kp, Ki)
+        Kp = input('Enter Kp: ')
+        ser.write((Kp+'\n').encode())
+        Ki = input('Enter Ki: ')
+        ser.write((Ki+'\n').encode())
+        gains_str = ser.read_until(b'\n')  # 'Kp Ki'
+        gains = gains_str.split()
+        Kp_Pos = float(gains[0])
+        Ki_Pos = float(gains[1])
+        print(f'Set position gains Kp={Kp_Pos} Ki={Ki_Pos}')
         pass
-    elif (selection == 'j'):
-        pass
-    elif (selection == 'k'):
+    elif (selection == 'j'):  # get position gains (Kp, Ki)
         gains_str = ser.read_until(b'\n')
         gains = gains_str.split()
-        Kp_float = float(gains[0])
-        Ki_float = float(gains[1])
+        Kp_Pos = float(gains[0])
+        Ki_Pos = float(gains[1])
+        print(f'Position gains Kp={Kp_Pos} Ki={Ki_Pos}')
+        pass
+    elif (selection == 'k'):  # test current control
+        gains_str = ser.read_until(b'\n')
+        gains = gains_str.split()
+        Kp_ICtrl = float(gains[0])
+        Ki_ICtrl = float(gains[1])
         print('Testing current control')
         # PIC will send ref and actual value in a loop
         # until 100 samples are taken
@@ -128,12 +147,20 @@ while not has_quit:
             actual_float = float(actual_str)
             ref_values.append(ref_float)
             actual_values.append(actual_float)
+        meanzip = zip(ref_values, actual_values)
+        meanlist = []
+        for i, j in meanzip:
+            meanlist.append(abs(i-j))
+        score = sum(meanlist)/len(meanlist)
         # print('Ref values:', ref_values)
         # print('Actual values:', actual_values)
         # plot the values on the same plot and save the figure
         plt.plot(ref_values, label=f'Reference [mA]')
         plt.plot(actual_values,
-                 label=f'Actual [mA] Kp={Kp_float} Ki={Ki_float}')
+                 label=f'Actual [mA] Kp={Kp_ICtrl} Ki={Ki_ICtrl}')
+        plt.text(0.95, 0.95, f'Score: {score:.2f}', transform=plt.gca().transAxes, fontsize=12,
+                 verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5),
+                 ha='right', va='top', padding=5)
         plt.legend()
         plt.xlabel('Sample')
         plt.ylabel('Current [mA]')
