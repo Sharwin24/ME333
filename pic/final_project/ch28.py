@@ -160,12 +160,12 @@ while not has_quit:
                  label=f'Actual [mA] Kp={Kp_ICtrl} Ki={Ki_ICtrl}')
         plt.text(0.95, 0.95, f'Score: {score:.2f}', transform=plt.gca().transAxes, fontsize=12,
                  verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5),
-                 ha='right', va='top', padding=5)
-        plt.legend()
+                 ha='right', va='top')
+        plt.legend(loc='lower right')
         plt.xlabel('Sample')
         plt.ylabel('Current [mA]')
         plt.title('Current Control Test')
-        plt.savefig('current_control_test.png')
+        plt.savefig(f'current_control_test_{score:.1f}.png')
         plt.close()
     elif (selection == 'l'):  # go to angle (deg)
         gains_str = ser.read_until(b'\n')
@@ -174,7 +174,7 @@ while not has_quit:
         Ki_Pos = float(gains[1])
         target = input('Enter target angle [deg]: ')
         ser.write((target+'\n').encode())
-        print('Going to angle')
+        print(f'Going to {target} [deg]')
         pass
     elif (selection == 'm'):
         pass

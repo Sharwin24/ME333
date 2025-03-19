@@ -29,10 +29,13 @@
 
 #define BUF_SIZE 200
 #define ENC_TICKS_PER_REV 1336
-#define ENC_COUNTS_TO_DEG (360 / ENC_TICKS_PER_REV)
+#define ENC_COUNTS_TO_DEG (360.0f / ENC_TICKS_PER_REV)
 
 #define PWM_FREQ 20000 // 20kHz
 #define PR2_VAL ((NU32DIP_SYS_FREQ / PWM_FREQ) / 256) - 1 // period value for 20kHz with 256 prescaler
+
+#define POS_CTRL_FREQ 200 // 200 Hz
+#define PR4_VAL ((NU32DIP_SYS_FREQ / POS_CTRL_FREQ) / 256) - 1 // period value for 200 Hz with 256 prescaler
 
 #define CURRENT_CTRL_FREQ 1000 // 1kHz
 #define CURRENT_CTRL_PR3_VAL ((NU32DIP_SYS_FREQ / CURRENT_CTRL_FREQ) / 256) - 1 // period value for 1kHz with 256 prescaler
@@ -43,17 +46,20 @@
 volatile float pwm_duty_cycle = 0.0;
 
 // Current control variables
-volatile float mA_Kp = 0.6;
-volatile float mA_Ki = 0.02;
+volatile float mA_Kp = 0.5;
+volatile float mA_Ki = 0.002;
 volatile float mA_integrator = 0.0;
 const float mA_integrator_max = 100.0;
 const float mA_integrator_min = -mA_integrator_max;
+volatile float reference_current = 0.0;
+
+// ITEST variables
 #define ITEST_MAX_COUNT 100
 float itest_ref_current[ITEST_MAX_COUNT];
 float itest_mA[ITEST_MAX_COUNT];
 
 // Position control variables
-volatile float pos_Kp = 0.2;
+volatile float pos_Kp = 0.5;
 volatile float pos_Ki = 0.001;
 volatile float pos_integrator = 0.0;
 const float pos_integrator_max = 359.0;
@@ -104,6 +110,21 @@ void setup_current_control_ISR() {
   __builtin_enable_interrupts();
 }
 
+void setup_position_control_ISR() {
+  // 200 Hz Position Control ISR
+  __builtin_disable_interrupts();
+  // Configure Timer4 to call an ISR at a frequency of 200 Hz with a priority of 5
+  T4CONbits.TCKPS = 0b111; // Timer4 prescaler N=256 (1:256)
+  PR4 = PR4_VAL; // period value for 200 Hz with 256 prescaler
+  TMR4 = 0; // initial TMR4 count is 0
+  T4CONbits.ON = 1; // turn on Timer4
+  IPC4bits.T4IP = 5; // interrupt priority 5
+  IFS0bits.T4IF = 0; // clear interrupt flag
+  IEC0bits.T4IE = 1; // enable interrupt
+  __builtin_enable_interrupts();
+}
+
+// 5kHz ISR
 void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
   mode_t m = get_mode();
 
@@ -121,7 +142,7 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     // Set the duty cycle and direction bit according to the value (-100 to 100)
     // Set the direction bit based on the sign of the PWM value
     NU32DIP_GREEN = 1;
-    DIR_PIN = (pwm_duty_cycle < 0) ? 1 : 0;
+    DIR_PIN = (pwm_duty_cycle < 0) ? 0 : 1;
     // Set the PWM duty cycle
     float dc = (float)abs(pwm_duty_cycle);
     OC3RS = (unsigned int)((dc / 100.0) * PR2_VAL);
@@ -174,6 +195,11 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     } else if (mA_integrator < mA_integrator_min) {
       mA_integrator = mA_integrator_min;
     }
+    if (u > 100.0) {
+      u = 100.0;
+    } else if (u < 0.0) {
+      u = 0.0;
+    }
     // Update the arrays for plotting
     itest_ref_current[counter] = ref_current;
     itest_mA[counter] = mA;
@@ -185,28 +211,31 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     // NU32DIP_WriteUART1(debug_msg);
 
     // Set the PWM duty cycle
-    OC3RS = (unsigned int)((abs(u) / 200.0) * PR2_VAL);
+    OC3RS = (unsigned int)((abs(u) / 100.0) * PR2_VAL);
     break;
   }
   case HOLD: {
-    // Read the encoder
-    float angle = read_encoder_deg();
-    // Compare the actual angle to the desired angle
-    float error = pos_target_angle - angle;
-    // Calculate a reference current using PID control gains
-    float u = pos_Kp * error + pos_Ki * pos_integrator;
-    pos_integrator += error;
-    if (pos_integrator > pos_integrator_max) {
-      pos_integrator = pos_integrator_max;
-    } else if (pos_integrator < pos_integrator_min) {
-      pos_integrator = pos_integrator_min;
+    // Use the global reference current
+    float mA = INA219_read_current();
+    float error = reference_current - mA;
+    float u = mA_Kp * error + mA_Ki * mA_integrator;
+    mA_integrator += error;
+    if (mA_integrator > mA_integrator_max) {
+      mA_integrator = mA_integrator_max;
+    } else if (mA_integrator < mA_integrator_min) {
+      mA_integrator = mA_integrator_min;
+    }
+    if (u > 100.0) {
+      u = 100.0;
+    } else if (u < 0.0) {
+      u = 0.0;
     }
 
     // Set the direction bit based on the sign of the error
     DIR_PIN = (error < 0) ? 1 : 0;
 
     // Apply current to the motor
-    OC3RS = (unsigned int)((abs(u) / 359.0) * PR2_VAL);
+    OC3RS = (unsigned int)((abs(u) / 100.0) * PR2_VAL);
     break;
   }
   case TRACK: {
@@ -221,12 +250,35 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
   IFS0bits.T3IF = 0;
 }
 
+// 200 Hz ISR
+void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionControlISR(void) {
+  // Read the encoder
+  float angle = read_encoder_deg();
+  // Compare the actual angle to the desired angle
+  float error = pos_target_angle - angle;
+  // Calculate a reference current using PID control gains
+  float u = pos_Kp * error + pos_Ki * pos_integrator;
+  pos_integrator += error;
+  if (pos_integrator > pos_integrator_max) {
+    pos_integrator = pos_integrator_max;
+  } else if (pos_integrator < pos_integrator_min) {
+    pos_integrator = pos_integrator_min;
+  }
+
+  // Assign global reference current to the motor
+  reference_current = u;
+
+  // Clear Interrupt flag
+  IFS0bits.T4IF = 0;
+}
+
 int main(void) {
   NU32DIP_Startup();
   UART2_Startup();
   INA219_Startup();
   setup_PWM();
   setup_current_control_ISR();
+  setup_position_control_ISR();
 
   // Setup DIR_PIN as an output
   TRISBbits.TRISB13 = 0;
