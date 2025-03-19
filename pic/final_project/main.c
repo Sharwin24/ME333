@@ -59,11 +59,12 @@ float itest_ref_current[ITEST_MAX_COUNT];
 float itest_mA[ITEST_MAX_COUNT];
 
 // Position control variables
-volatile float pos_Kp = 0.9;
-volatile float pos_Ki = 0.01;
-volatile float pos_Kd = 0.0;
+volatile float pos_Kp = 0.05;
+volatile float pos_Ki = 0.05;
+volatile float pos_Kd = 15.0;
 volatile float pos_integrator = 0.0;
-const float pos_integrator_max = 359.0;
+volatile float pos_prev_error = 0.0;
+const float pos_integrator_max = 1000.0;
 const float pos_integrator_min = -pos_integrator_max;
 volatile float pos_target_angle = 0.0;
 // #define POS_MAX_COUNT 100
@@ -257,14 +258,16 @@ void __ISR(_TIMER_4_VECTOR, IPL4SOFT) PositionControlISR(void) {
   float angle = read_encoder_deg();
   // Compare the actual angle to the desired angle
   float error = pos_target_angle - angle;
-  // Calculate a reference current using PID control gains
-  float u = pos_Kp * error + pos_Ki * pos_integrator + pos_Kd * (error - pos_integrator);
   pos_integrator += error;
   if (pos_integrator > pos_integrator_max) {
     pos_integrator = pos_integrator_max;
   } else if (pos_integrator < pos_integrator_min) {
     pos_integrator = pos_integrator_min;
   }
+  // Calculate a reference current using PID control gains
+  float u = pos_Kp * error + pos_Ki * pos_integrator + pos_Kd * (error - pos_prev_error);
+  // Update the previous error
+  pos_prev_error = error;
 
   // Assign global reference current to the motor
   reference_current = u;
@@ -352,19 +355,21 @@ int main(void) {
       NU32DIP_WriteUART1(m);
       break;
     }
-    case 'i': { // set position gains (Kp, Ki)
+    case 'i': { // set position gains (Kp, Ki, Kd)
       NU32DIP_ReadUART1(buffer, BUF_SIZE);
       sscanf(buffer, "%f", &pos_Kp);
       NU32DIP_ReadUART1(buffer, BUF_SIZE);
       sscanf(buffer, "%f", &pos_Ki);
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%f", &pos_Kd);
       char m[50];
-      sprintf(m, "%f %f\r\n", pos_Kp, pos_Ki);
+      sprintf(m, "%f %f %f\r\n", pos_Kp, pos_Ki, pos_Kd);
       NU32DIP_WriteUART1(m);
       break;
     }
-    case 'j': { // get position gains (Kp, Ki)
+    case 'j': { // get position gains (Kp, Ki, Kd)
       char m[50];
-      sprintf(m, "%f %f\r\n", pos_Kp, pos_Ki);
+      sprintf(m, "%f %f %f\r\n", pos_Kp, pos_Ki, pos_Kd);
       NU32DIP_WriteUART1(m);
       break;
     }

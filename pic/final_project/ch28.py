@@ -33,7 +33,7 @@ MENU_STR = """\
 \tc: Read encoder (counts)                 d: Read encoder (deg)
 \te: Reset encoder                         f: Set PWM (-100 to 100)
 \tg: Set current gains (Kp, Ki)            h: Get current gains (Kp, Ki)
-\ti: Set position gains (Kp, Ki)           j: Get position gains (Kp, Ki)
+\ti: Set position gains (Kp, Ki, Kd)       j: Get position gains (Kp, Ki, Kd)
 \tk: Test current control                  l: Go to angle (deg)
 \tm: Load step trajectory                  n: Load cubic trajectory
 \to: Execute trajectory                    p: Unpower the motor
@@ -56,6 +56,7 @@ Ki_ICtrl = 0.0
 # Position Control Gains
 Kp_Pos = 0.0
 Ki_Pos = 0.0
+Kd_Pos = 0.0
 
 has_quit = False
 # menu loop
@@ -112,23 +113,27 @@ while not has_quit:
         Kp_ICtrl = float(gains[0])
         Ki_ICtrl = float(gains[1])
         print(f'Current gains Kp={Kp_ICtrl} Ki={Ki_ICtrl}')
-    elif (selection == 'i'):  # set position gains (Kp, Ki)
+    elif (selection == 'i'):  # set position gains (Kp, Ki, Kd)
         Kp = input('Enter Kp: ')
         ser.write((Kp+'\n').encode())
         Ki = input('Enter Ki: ')
         ser.write((Ki+'\n').encode())
+        Kd = input('Enter Kd: ')
+        ser.write((Kd+'\n').encode())
         gains_str = ser.read_until(b'\n')  # 'Kp Ki'
         gains = gains_str.split()
         Kp_Pos = float(gains[0])
         Ki_Pos = float(gains[1])
-        print(f'Set position gains Kp={Kp_Pos} Ki={Ki_Pos}')
+        Kd_Pos = float(gains[2])
+        print(f'Set position gains Kp={Kp_Pos} Ki={Ki_Pos} Kd={Kd_Pos}')
         pass
-    elif (selection == 'j'):  # get position gains (Kp, Ki)
+    elif (selection == 'j'):  # get position gains (Kp, Ki, Kd)
         gains_str = ser.read_until(b'\n')
         gains = gains_str.split()
         Kp_Pos = float(gains[0])
         Ki_Pos = float(gains[1])
-        print(f'Position gains Kp={Kp_Pos} Ki={Ki_Pos}')
+        Kd_Pos = float(gains[2])
+        print(f'Position gains Kp={Kp_Pos} Ki={Ki_Pos} Kd={Kd_Pos}')
         pass
     elif (selection == 'k'):  # test current control
         gains_str = ser.read_until(b'\n')
