@@ -59,9 +59,9 @@ float itest_ref_current[ITEST_MAX_COUNT];
 float itest_mA[ITEST_MAX_COUNT];
 
 // Position control variables
-volatile float pos_Kp = 0.5;
+volatile float pos_Kp = 5.0;
 volatile float pos_Ki = 0.0;
-volatile float pos_Kd = 1000.0;
+volatile float pos_Kd = 2.0;
 volatile float pos_integrator = 0.0;
 volatile float pos_prev_error = 0.0;
 const float pos_integrator_max = 1000.0;
@@ -79,7 +79,7 @@ float read_encoder_deg() {
   while (!get_encoder_flag()) {}
   set_encoder_flag(0);
   // make sure p is in the range [0, 1336)
-  int p = get_encoder_count() % ENC_TICKS_PER_REV;
+  int p = get_encoder_count();//% ENC_TICKS_PER_REV;
   // Convert encoder counts to degrees
   return (float)p * ENC_COUNTS_TO_DEG;
 }

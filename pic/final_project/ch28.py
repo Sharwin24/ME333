@@ -201,7 +201,7 @@ while not has_quit:
         ser.write((str(num_steps)+'\n').encode())
         # ref is a list of time and angles (0, 0, 1, 90, 2, 45, 3, 45)
         for i in ref:
-            ser.write((str(ref[i])+'\n').encode())
+            ser.write((str(i)+'\n').encode())
         print(f'Loaded cubic trajectory with {num_steps} steps')
     elif (selection == 'o'):  # execute trajectory
         ser.timeout = 3
@@ -236,7 +236,7 @@ while not has_quit:
                  verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5),
                  ha='right', va='top')
         plt.title(f'Trajectory Test ({traj_type})')
-        plt.savefig(f'trajectory_test.png')
+        plt.savefig(f'{traj_type}_trajectory_test.png')
         plt.close()
     elif (selection == 'p'):  # unpower the motor
         pass
