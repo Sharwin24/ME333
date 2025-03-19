@@ -24,6 +24,7 @@
 import matplotlib.pyplot as plt
 import serial
 import os
+from genref import genRef
 ser = serial.Serial('/dev/ttyUSB0', 230400)
 print('Opening port: ')
 print(ser.name)
@@ -57,6 +58,9 @@ Ki_ICtrl = 0.0
 Kp_Pos = 0.0
 Ki_Pos = 0.0
 Kd_Pos = 0.0
+
+# Saved traj type
+traj_type = 'None'
 
 has_quit = False
 # menu loop
@@ -177,17 +181,64 @@ while not has_quit:
         gains = gains_str.split()
         Kp_Pos = float(gains[0])
         Ki_Pos = float(gains[1])
+        Kd_Pos = float(gains[2])
         target = input('Enter target angle [deg]: ')
         ser.write((target+'\n').encode())
         print(f'Going to {target} [deg]')
-        pass
-    elif (selection == 'm'):
-        pass
-    elif (selection == 'n'):
-        pass
-    elif (selection == 'o'):
-        pass
-    elif (selection == 'p'):
+    elif (selection == 'm'):  # load step trajectory
+        ref = genRef('step')
+        traj_type = 'step'
+        num_steps = len(ref)
+        ser.write((str(num_steps)+'\n').encode())
+        # ref is a list of time and angles (0, 0, 1, 90, 2, 45, 3, 45)
+        for i in ref:
+            ser.write((str(i)+'\n').encode())
+        print(f'Loaded step trajectory with {num_steps} steps')
+    elif (selection == 'n'):  # Load cubic trajectory
+        ref = genRef('cubic')
+        traj_type = 'cubic'
+        num_steps = len(ref)
+        ser.write((str(num_steps)+'\n').encode())
+        # ref is a list of time and angles (0, 0, 1, 90, 2, 45, 3, 45)
+        for i in ref:
+            ser.write((str(ref[i])+'\n').encode())
+        print(f'Loaded cubic trajectory with {num_steps} steps')
+    elif (selection == 'o'):  # execute trajectory
+        ser.timeout = 3
+        gains_str = ser.read_until(b'\n')
+        if not gains_str:
+            print('Error: No response from PIC32')
+            continue
+        gains = gains_str.split()
+        Kp_Pos = float(gains[0])
+        Ki_Pos = float(gains[1])
+        Kd_Pos = float(gains[2])
+        print(f'Using gains Kp={Kp_Pos} Ki={Ki_Pos} Kd={Kd_Pos}')
+        ref_values = []
+        actual_values = []
+        num_steps_str = ser.read_until(b'\n')
+        num_steps = int(num_steps_str)
+        print(f'Executing trajectory with {num_steps} steps')
+        for i in range(num_steps):
+            actual_str = ser.read_until(b'\n')
+            ref_str = ser.read_until(b'\n')
+            actual_float = float(actual_str)
+            ref_float = float(ref_str)
+            ref_values.append(ref_float)
+            actual_values.append(actual_float)
+        # plot the values on the same plot and save the figure
+        plt.plot(actual_values, label=f'Actual [deg]')
+        plt.plot(ref_values, label=f'Reference [deg]', linestyle='--')
+        plt.legend(loc='lower right')
+        plt.xlabel('Step')
+        plt.ylabel('Angle [deg]')
+        plt.text(0.95, 0.95, f'Kp={Kp_Pos} Ki={Ki_Pos} Kd={Kd_Pos}', transform=plt.gca().transAxes, fontsize=12,
+                 verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5),
+                 ha='right', va='top')
+        plt.title(f'Trajectory Test ({traj_type})')
+        plt.savefig(f'trajectory_test.png')
+        plt.close()
+    elif (selection == 'p'):  # unpower the motor
         pass
     elif (selection == 'q'):  # quit client
         print('Exiting client')

@@ -59,17 +59,20 @@ float itest_ref_current[ITEST_MAX_COUNT];
 float itest_mA[ITEST_MAX_COUNT];
 
 // Position control variables
-volatile float pos_Kp = 0.05;
-volatile float pos_Ki = 0.05;
-volatile float pos_Kd = 15.0;
+volatile float pos_Kp = 0.5;
+volatile float pos_Ki = 0.0;
+volatile float pos_Kd = 1000.0;
 volatile float pos_integrator = 0.0;
 volatile float pos_prev_error = 0.0;
 const float pos_integrator_max = 1000.0;
 const float pos_integrator_min = -pos_integrator_max;
 volatile float pos_target_angle = 0.0;
-// #define POS_MAX_COUNT 100
-// float pos_ref_angle[POS_MAX_COUNT];
-// float pos_angle[POS_MAX_COUNT];
+
+// Step trajectory variables
+#define MAX_STEPS 1000
+volatile int num_steps = 0;
+volatile float pos_ref_angle[MAX_STEPS];
+volatile float pos_actual_angle[MAX_STEPS];
 
 float read_encoder_deg() {
   WriteUART2("a");
@@ -133,7 +136,6 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
   // Perform control based on mode
   switch (m) {
   case IDLE: {
-    NU32DIP_GREEN = 0;
     // Set the H-bridge to brake mode
     DIR_PIN = 0;
     // Set the PWM value to 0
@@ -143,7 +145,6 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
   case PWM: {
     // Set the duty cycle and direction bit according to the value (-100 to 100)
     // Set the direction bit based on the sign of the PWM value
-    NU32DIP_GREEN = 1;
     DIR_PIN = (pwm_duty_cycle < 0) ? 0 : 1;
     // Set the PWM duty cycle
     float dc = (float)abs(pwm_duty_cycle);
@@ -241,11 +242,30 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     break;
   }
   case TRACK: {
+    // Use the global reference current
+    float mA = INA219_read_current();
+    float error = reference_current - mA;
+    mA_integrator += error;
+    if (mA_integrator > mA_integrator_max) {
+      mA_integrator = mA_integrator_max;
+    } else if (mA_integrator < mA_integrator_min) {
+      mA_integrator = mA_integrator_min;
+    }
+    float u = mA_Kp * error + mA_Ki * mA_integrator;
+    if (u > 100.0) {
+      u = 100.0;
+    } else if (u < 0.0) {
+      u = 0.0;
+    }
+
+    // Set the direction bit based on the sign of the error
+    DIR_PIN = (error < 0) ? 1 : 0;
+
+    // Apply current to the motor
+    OC3RS = (unsigned int)((abs(u) / 100.0) * PR2_VAL);
     break;
   }
-  default: {
-    break;
-  }
+  default: { break; }
   }
 
   // Clear Interrupt flag
@@ -254,23 +274,82 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
 
 // 200 Hz ISR
 void __ISR(_TIMER_4_VECTOR, IPL4SOFT) PositionControlISR(void) {
-  // Read the encoder
-  float angle = read_encoder_deg();
-  // Compare the actual angle to the desired angle
-  float error = pos_target_angle - angle;
-  pos_integrator += error;
-  if (pos_integrator > pos_integrator_max) {
-    pos_integrator = pos_integrator_max;
-  } else if (pos_integrator < pos_integrator_min) {
-    pos_integrator = pos_integrator_min;
-  }
-  // Calculate a reference current using PID control gains
-  float u = pos_Kp * error + pos_Ki * pos_integrator + pos_Kd * (error - pos_prev_error);
-  // Update the previous error
-  pos_prev_error = error;
+  mode_t m = get_mode();
+  switch (m) {
+  case HOLD: {
+    // Read the encoder
+    float angle = read_encoder_deg();
+    // Compare the actual angle to the desired angle
+    float error = pos_target_angle - angle;
+    pos_integrator += error;
+    if (pos_integrator > pos_integrator_max) {
+      pos_integrator = pos_integrator_max;
+    } else if (pos_integrator < pos_integrator_min) {
+      pos_integrator = pos_integrator_min;
+    }
+    // Calculate a reference current using PID control gains
+    float u = pos_Kp * error + pos_Ki * pos_integrator + pos_Kd * (error - pos_prev_error);
+    // Update the previous error
+    pos_prev_error = error;
 
-  // Assign global reference current to the motor
-  reference_current = u;
+    // Assign global reference current to the motor
+    reference_current = u;
+    break;
+  }
+  case TRACK: {
+    static int ref_index = 0;
+    if (ref_index == 0) {
+      // Reset the integrator and previous error
+      pos_integrator = 0.0;
+      pos_prev_error = 0.0;
+    }
+
+    // Set the target angle based on the current index
+    pos_target_angle = pos_ref_angle[ref_index];
+
+    // Read the encoder
+    float angle = read_encoder_deg();
+    // Update the actual angle array
+    pos_actual_angle[ref_index] = angle;
+    // Compare the actual angle to the desired angle
+    float error = pos_target_angle - angle;
+    pos_integrator += error;
+    if (pos_integrator > pos_integrator_max) {
+      pos_integrator = pos_integrator_max;
+    } else if (pos_integrator < pos_integrator_min) {
+      pos_integrator = pos_integrator_min;
+    }
+    // Calculate a reference current using PID control gains
+    float u = pos_Kp * error + pos_Ki * pos_integrator + pos_Kd * (error - pos_prev_error);
+    // Update the previous error
+    pos_prev_error = error;
+
+    // Assign global reference current to the motor
+    reference_current = u;
+
+    // Increment the reference index and wrap around if necessary
+    ref_index++;
+    // Once at the end, set the mode to HOLD
+    if (ref_index == num_steps) {
+      ref_index = 0;
+      set_mode(HOLD);
+      // Send measured angles to python
+      char message[BUF_SIZE];
+      for (int i = 0; i < num_steps; i++) {
+        sprintf(message, "%f\r\n", pos_actual_angle[i]);
+        NU32DIP_WriteUART1(message);
+        sprintf(message, "%f\r\n", pos_ref_angle[i]);
+        NU32DIP_WriteUART1(message);
+      }
+    }
+
+    break;
+  }
+  case IDLE: { break; } // Do nothing 
+  case PWM: { break; } // Do nothing 
+  case ITEST: { break; } // Do nothing 
+  default: { break; }
+  }
 
   // Clear Interrupt flag
   IFS0bits.T4IF = 0;
@@ -296,6 +375,7 @@ int main(void) {
   while (1) {
     NU32DIP_ReadUART1(buffer, BUF_SIZE); // we expect the next character to be a menu command
     NU32DIP_YELLOW = 1; // clear the error LED
+    NU32DIP_GREEN = 0; // clear the success LED
     switch (buffer[0]) {
     case 'a': { // read current sensor (ADC counts)
       break;
@@ -382,7 +462,7 @@ int main(void) {
     }
     case 'l': { // go to angle (deg)
       char m[50];
-      sprintf(m, "%f %f\r\n", pos_Kp, pos_Ki);
+      sprintf(m, "%f %f %f\r\n", pos_Kp, pos_Ki, pos_Kd);
       NU32DIP_WriteUART1(m);
       // Ask for target angle
       NU32DIP_ReadUART1(buffer, BUF_SIZE);
@@ -390,13 +470,31 @@ int main(void) {
       set_mode(HOLD);
       break;
     }
-    case 'm': {
+    case 'm': { // load step trajectory
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%d", &num_steps);
+      for (int i = 0; i < num_steps; i++) {
+        NU32DIP_ReadUART1(buffer, BUF_SIZE);
+        sscanf(buffer, "%f", &pos_ref_angle[i]);
+      }
       break;
     }
-    case 'n': {
+    case 'n': { // load cubic trajectory
+      NU32DIP_ReadUART1(buffer, BUF_SIZE);
+      sscanf(buffer, "%d", &num_steps);
+      for (int i = 0; i < num_steps; i++) {
+        NU32DIP_ReadUART1(buffer, BUF_SIZE);
+        sscanf(buffer, "%f", &pos_ref_angle[i]);
+      }
       break;
     }
-    case 'o': {
+    case 'o': { // execute trajectory
+      char m[50];
+      sprintf(m, "%f %f %f\r\n", pos_Kp, pos_Ki, pos_Kd);
+      NU32DIP_WriteUART1(m);
+      sprintf(m, "%d\r\n", num_steps);
+      NU32DIP_WriteUART1(m);
+      set_mode(TRACK);
       break;
     }
     case 'p': { // unpower the motor
