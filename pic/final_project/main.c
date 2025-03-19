@@ -46,10 +46,10 @@
 volatile float pwm_duty_cycle = 0.0;
 
 // Current control variables
-volatile float mA_Kp = 0.5;
-volatile float mA_Ki = 0.002;
+volatile float mA_Kp = 0.05;
+volatile float mA_Ki = 0.055;
 volatile float mA_integrator = 0.0;
-const float mA_integrator_max = 100.0;
+const float mA_integrator_max = 1000.0;
 const float mA_integrator_min = -mA_integrator_max;
 volatile float reference_current = 0.0;
 
@@ -59,8 +59,9 @@ float itest_ref_current[ITEST_MAX_COUNT];
 float itest_mA[ITEST_MAX_COUNT];
 
 // Position control variables
-volatile float pos_Kp = 0.5;
-volatile float pos_Ki = 0.001;
+volatile float pos_Kp = 0.9;
+volatile float pos_Ki = 0.01;
+volatile float pos_Kd = 0.0;
 volatile float pos_integrator = 0.0;
 const float pos_integrator_max = 359.0;
 const float pos_integrator_min = -pos_integrator_max;
@@ -118,7 +119,7 @@ void setup_position_control_ISR() {
   PR4 = PR4_VAL; // period value for 200 Hz with 256 prescaler
   TMR4 = 0; // initial TMR4 count is 0
   T4CONbits.ON = 1; // turn on Timer4
-  IPC4bits.T4IP = 5; // interrupt priority 5
+  IPC4bits.T4IP = 4; // interrupt priority 4
   IFS0bits.T4IF = 0; // clear interrupt flag
   IEC0bits.T4IE = 1; // enable interrupt
   __builtin_enable_interrupts();
@@ -188,13 +189,13 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     // Read the current sensor
     float mA = INA219_read_current();
     float error = ref_current - mA;
-    float u = mA_Kp * error + mA_Ki * mA_integrator;
     mA_integrator += error;
     if (mA_integrator > mA_integrator_max) {
       mA_integrator = mA_integrator_max;
     } else if (mA_integrator < mA_integrator_min) {
       mA_integrator = mA_integrator_min;
     }
+    float u = mA_Kp * error + mA_Ki * mA_integrator;
     if (u > 100.0) {
       u = 100.0;
     } else if (u < 0.0) {
@@ -218,13 +219,13 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
     // Use the global reference current
     float mA = INA219_read_current();
     float error = reference_current - mA;
-    float u = mA_Kp * error + mA_Ki * mA_integrator;
     mA_integrator += error;
     if (mA_integrator > mA_integrator_max) {
       mA_integrator = mA_integrator_max;
     } else if (mA_integrator < mA_integrator_min) {
       mA_integrator = mA_integrator_min;
     }
+    float u = mA_Kp * error + mA_Ki * mA_integrator;
     if (u > 100.0) {
       u = 100.0;
     } else if (u < 0.0) {
@@ -251,13 +252,13 @@ void __ISR(_TIMER_3_VECTOR, IPL5SOFT) CurrentControlISR(void) {
 }
 
 // 200 Hz ISR
-void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionControlISR(void) {
+void __ISR(_TIMER_4_VECTOR, IPL4SOFT) PositionControlISR(void) {
   // Read the encoder
   float angle = read_encoder_deg();
   // Compare the actual angle to the desired angle
   float error = pos_target_angle - angle;
   // Calculate a reference current using PID control gains
-  float u = pos_Kp * error + pos_Ki * pos_integrator;
+  float u = pos_Kp * error + pos_Ki * pos_integrator + pos_Kd * (error - pos_integrator);
   pos_integrator += error;
   if (pos_integrator > pos_integrator_max) {
     pos_integrator = pos_integrator_max;
